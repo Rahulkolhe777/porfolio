@@ -16,10 +16,10 @@ const MAX_STRANDS = 4;
 const SEG = 7; // segments per strand
 const MAX_SEG = 36;
 const MAX_DROPS = 16;
-const MAX_SPARKS = 24;
+const MAX_SPARKS = 28;
 const REACH = 170; // px from the surface where the liquid starts reaching
 const MAX_LEN = 250; // strands snap beyond this length
-const LUMP_MAX = 34; // how far the lump can pull out of the body
+const LUMP_MAX = 20; // how far the dripping lump can pull out when the cursor is very close
 
 const VERT = `
 attribute vec2 aPos;
@@ -39,7 +39,9 @@ uniform int uNSeg;
 uniform vec3 uDrop[${MAX_DROPS}];
 uniform int uNDrop;
 uniform vec4 uSpark[${MAX_SPARKS}];
+uniform vec2 uSparkA[${MAX_SPARKS}];
 uniform int uNSpark;
+uniform float uTime;
 uniform vec3 uGlow;
 uniform float uHover;
 
@@ -74,15 +76,26 @@ float height(float d) {
   float t = clamp(-d / 16.0, 0.0, 1.0);
   return sqrt(1.0 - (1.0 - t) * (1.0 - t)) * 16.0;
 }
+// splatter: thin bright streaks (each spark is a short line along its motion)
 float sparks(vec2 p) {
   float s = 0.0;
   for (int i = 0; i < ${MAX_SPARKS}; i++) {
     if (i >= uNSpark) break;
-    vec2 q = p - uSpark[i].xy;
-    float r = uSpark[i].z;
-    s += uSpark[i].w * (exp(-dot(q, q) / (r * r)) + 0.25 * exp(-dot(q, q) / (r * r * 9.0)));
+    vec2 a = uSpark[i].xy, b = uSpark[i].zw;
+    vec2 pa = p - a, ba = b - a;
+    float h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-4), 0.0, 1.0);
+    vec2 q = pa - ba * h;
+    float r = uSparkA[i].x;
+    float d2 = dot(q, q);
+    s += uSparkA[i].y * (exp(-d2 / (r * r)) + 0.18 * exp(-d2 / (r * r * 12.0)));
   }
   return s;
+}
+float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float vnoise(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y);
 }
 
 void main() {
@@ -111,12 +124,19 @@ void main() {
   float env = smoothstep(0.0, -0.9, R.y) * 0.62 + smoothstep(0.3, 0.95, abs(R.x)) * 0.28 + smoothstep(0.3, 0.95, R.y) * 0.06;
   float fres = pow(1.0 - n.z, 2.0);
 
-  vec3 col = vec3(0.01, 0.011, 0.016);
+  vec3 col = vec3(0.012, 0.013, 0.018);
   col += max(dot(n, L), 0.0) * 0.03;
-  col += env * vec3(0.7, 0.74, 0.82) * (0.25 + fres * 1.2);
+  col += env * vec3(0.72, 0.75, 0.8) * (0.25 + fres * 1.2);
   col += spec * vec3(1.0);
-  col += spec2 * mix(uGlow, vec3(1.0), 0.35);
-  col += fres * uGlow * (0.18 + 0.3 * uHover);
+  col += spec2 * mix(uGlow, vec3(1.0), 0.6);
+  // bright grey rim all round the liquid (strongest on the upper edges)
+  col += fres * vec3(0.62, 0.64, 0.68) * (0.75 + 0.5 * smoothstep(0.3, -0.6, n.y));
+  col += fres * uGlow * (0.08 + 0.2 * uHover);
+  // slow smoky reflections drifting inside the glossy body
+  vec2 sp2 = p * vec2(0.022, 0.05) + vec2(uTime * 0.12, -uTime * 0.05);
+  float smoke = vnoise(sp2) * 0.6 + vnoise(sp2 * 2.3 + 4.0) * 0.4;
+  float innerAll = smoothstep(-5.0, -14.0, d);
+  col += innerAll * smoothstep(0.55, 0.85, smoke) * vec3(0.32, 0.34, 0.38) * 0.55;
 
   // soft studio-light reflection across the top of the pill
   float yRel = (p.y - (uBox.y - uBox.w)) / (2.0 * uBox.w);
@@ -167,7 +187,7 @@ export function createVenom(button, canvas, { color = '#2f7bff' } = {}) {
   gl.enableVertexAttribArray(aPos);
   gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
   const U = {};
-  ['uRes', 'uDpr', 'uBox', 'uLump', 'uLumpR', 'uSeg', 'uSegR', 'uNSeg', 'uDrop', 'uNDrop', 'uSpark', 'uNSpark', 'uGlow', 'uHover'].forEach((k) => {
+  ['uRes', 'uDpr', 'uBox', 'uLump', 'uLumpR', 'uSeg', 'uSegR', 'uNSeg', 'uDrop', 'uNDrop', 'uSpark', 'uSparkA', 'uNSpark', 'uGlow', 'uHover', 'uTime'].forEach((k) => {
     U[k] = gl.getUniformLocation(prog, k);
   });
   gl.uniform3fv(U.uGlow, hexToRgb(color));
@@ -252,9 +272,9 @@ export function createVenom(button, canvas, { color = '#2f7bff' } = {}) {
         y: y + (Math.random() - 0.5) * 6,
         vx: Math.cos(a) * v + dirx,
         vy: Math.sin(a) * v + diry,
-        r: 0.9 + Math.random() * 1.6,
+        r: 0.55 + Math.random() * 0.7,
         life: 0,
-        max: 0.18 + Math.random() * 0.3,
+        max: 0.12 + Math.random() * 0.22,
       });
     }
   };
@@ -275,12 +295,18 @@ export function createVenom(button, canvas, { color = '#2f7bff' } = {}) {
   };
 
   const spawn = (k) => {
+    const spread = [0, -0.8, 0.8, -0.4][k] ?? 0;
+    const dx = pointer.x - box.cx;
+    const dy = pointer.y - box.cy;
+    const len = Math.hypot(dx, dy) || 1;
+    const off = spread * box.hh * 1.6;
+    nearestSurface(pointer.x + (-dy / len) * off, pointer.y + (dx / len) * off, tmp);
     strands.push({
       state: 'attached',
       t: 0,
-      spread: [0, -7, 7, -13][k] ?? 0,
-      root: { x: lump.tx, y: lump.ty },
-      tip: { x: lump.tx, y: lump.ty },
+      spread,
+      root: { x: tmp.x - tmp.nx * 2, y: tmp.y - tmp.ny * 2 },
+      tip: { x: tmp.x, y: tmp.y },
       wob: { x: 0, y: 0, vx: 0, vy: 0 },
       sag: (Math.random() - 0.5) * 0.08,
       grow: 0,
@@ -299,7 +325,8 @@ export function createVenom(button, canvas, { color = '#2f7bff' } = {}) {
     // the strands are to snapping; springy so it wobbles when released
     if (pointer.present) {
       nearestSurface(pointer.x, pointer.y, tmp);
-      const k = 1 - Math.exp(-10 * dt);
+      // snap straight to the surface when idle (no strands hanging off it)
+      const k = strands.length ? 1 - Math.exp(-10 * dt) : 1;
       lump.x += (tmp.x - lump.x) * k;
       lump.y += (tmp.y - lump.y) * k;
       const nl = Math.hypot(lump.nx + (tmp.nx - lump.nx) * k, lump.ny + (tmp.ny - lump.ny) * k) || 1;
@@ -310,7 +337,9 @@ export function createVenom(button, canvas, { color = '#2f7bff' } = {}) {
     const pull = attached.length
       ? Math.min(1, Math.max(...attached.map((s) => Math.hypot(s.tip.x - s.root.x, s.tip.y - s.root.y))) / MAX_LEN)
       : 0;
-    const want = near ? 8 + (attached.length ? 10 + pull * (LUMP_MAX - 18) : 4 * (1 - dOut / REACH)) : 0;
+    // a gooey lump only bulges out when the cursor is right next to the body
+    const closeK = near ? Math.max(0, 1 - dOut / 80) : 0;
+    const want = closeK * LUMP_MAX * (0.6 + 0.4 * (1 - pull));
     lump.vel += ((want - lump.len) * 160 - lump.vel * 10) * dt;
     lump.len += lump.vel * dt;
     lump.tx = lump.x + lump.nx * Math.max(lump.len, 0);
@@ -329,11 +358,13 @@ export function createVenom(button, canvas, { color = '#2f7bff' } = {}) {
       s.t += dt;
       if (s.state === 'attached') {
         // roots fan out across the lump tip, tips converge on the cursor
-        // strands start bundled together and only fan apart as they stretch
-        const fan = s.spread * Math.min(1, Math.max(0.1, (s.len || 0) / 110));
-        const rx = lump.tx + (-pdy / plen) * fan;
-        const ry = lump.ty + (pdx / plen) * fan;
-        const rk = 1 - Math.exp(-14 * dt);
+        // roots sit spread across the facing end of the body (top, middle,
+        // bottom of the cap) and slide there slowly, like something sticky
+        const off = s.spread * box.hh * 1.6;
+        nearestSurface(pointer.x + (-pdy / plen) * off, pointer.y + (pdx / plen) * off, tmp);
+        const rx = tmp.x - tmp.nx * 2 + (lump.tx - lump.x) * (s.spread === 0 ? 1 : 0.3);
+        const ry = tmp.y - tmp.ny * 2 + (lump.ty - lump.y) * (s.spread === 0 ? 1 : 0.3);
+        const rk = 1 - Math.exp(-8 * dt);
         s.root.x += (rx - s.root.x) * rk;
         s.root.y += (ry - s.root.y) * rk;
         s.grow = Math.min(1, s.grow + dt * 6);
@@ -355,9 +386,6 @@ export function createVenom(button, canvas, { color = '#2f7bff' } = {}) {
       } else {
         // whip back into the lump: roots gather together, tip reels in fast
         const t = s.t;
-        const gk = 1 - Math.exp(-18 * dt);
-        s.root.x += (lump.tx - s.root.x) * gk;
-        s.root.y += (lump.ty - s.root.y) * gk;
         const f = Math.exp(-t * 13) * (1 + t * 13);
         s.tip.x = s.root.x + (s.from.x - s.root.x) * f;
         s.tip.y = s.root.y + (s.from.y - s.root.y) * f;
@@ -370,10 +398,10 @@ export function createVenom(button, canvas, { color = '#2f7bff' } = {}) {
     // a spray of glowing specks where the strands grab the cursor
     if (attached.length && !reduced) {
       const moved = Math.hypot(pointer.x - pointer.px, pointer.y - pointer.py);
-      sparkClock += dt * (6 + Math.min(moved, 30) * 1.2);
+      sparkClock += dt * (22 + Math.min(moved, 30) * 2);
       while (sparkClock > 1) {
         sparkClock -= 1;
-        addSparks(pointer.x, pointer.y, 1, 70, (pointer.x - pointer.px) * 4, (pointer.y - pointer.py) * 4);
+        addSparks(pointer.x, pointer.y, 1, 260, (pointer.x - pointer.px) * 3, (pointer.y - pointer.py) * 3);
       }
     }
     pointer.px = pointer.x;
@@ -401,6 +429,7 @@ export function createVenom(button, canvas, { color = '#2f7bff' } = {}) {
   const segR = new Float32Array(MAX_SEG * 2);
   const dropBuf = new Float32Array(MAX_DROPS * 3);
   const sparkBuf = new Float32Array(MAX_SPARKS * 4);
+  const sparkA = new Float32Array(MAX_SPARKS * 2);
   const P = (s, t, out) => {
     // nearly straight, taut curve root → tip with a little sag and twang
     const mx = (s.root.x + s.tip.x) / 2;
@@ -420,10 +449,10 @@ export function createVenom(button, canvas, { color = '#2f7bff' } = {}) {
       const L = Math.hypot(s.tip.x - s.root.x, s.tip.y - s.root.y);
       const stretch = Math.min(1, L / MAX_LEN);
       const fade = s.state === 'attached' ? Math.min(1, s.t * 7) : Math.max(0, 1 - s.t / 0.32);
-      const rootR = (5 - 1.5 * stretch) * fade;
-      const midR = Math.max(0.75, 3.2 * (1 - stretch) ** 1.4 + 0.75) * fade;
-      const tipR = 1.9 * fade;
-      const rad = (t) => (t < 0.5 ? rootR + (midR - rootR) * Math.min(1, t / 0.3) : midR + (tipR - midR) * Math.max(0, (t - 0.75) / 0.25));
+      const rootR = (5.5 - 2 * stretch) * fade;
+      const midR = Math.max(1.05, 2.6 * (1 - stretch) ** 1.4 + 1.05) * fade;
+      const tipR = 1.5 * fade;
+      const rad = (t) => (t < 0.5 ? rootR + (midR - rootR) * Math.min(1, t / 0.18) : midR + (tipR - midR) * Math.max(0, (t - 0.8) / 0.2));
       for (let i = 0; i < SEG && n < MAX_SEG; i++) {
         const t0 = i / SEG;
         const t1 = (i + 1) / SEG;
@@ -440,7 +469,9 @@ export function createVenom(button, canvas, { color = '#2f7bff' } = {}) {
     });
     sparks.forEach((p, i) => {
       const k = 1 - p.life / p.max;
-      sparkBuf.set([p.x, p.y, p.r, k * k * 1.3], i * 4);
+      // streak from the spark back along its velocity
+      sparkBuf.set([p.x, p.y, p.x - p.vx * 0.035, p.y - p.vy * 0.035], i * 4);
+      sparkA.set([p.r, k * 1.4], i * 2);
     });
     const sq = 1 - press * 0.05;
     gl.uniform2f(U.uRes, canvas.width, canvas.height);
@@ -460,6 +491,8 @@ export function createVenom(button, canvas, { color = '#2f7bff' } = {}) {
     gl.uniform3fv(U.uDrop, dropBuf);
     gl.uniform1i(U.uNDrop, drops.length);
     gl.uniform4fv(U.uSpark, sparkBuf);
+    gl.uniform2fv(U.uSparkA, sparkA);
+    gl.uniform1f(U.uTime, (performance.now() / 1000) % 1000);
     gl.uniform1i(U.uNSpark, sparks.length);
     gl.uniform1f(U.uHover, hover);
     gl.clearColor(0, 0, 0, 0);
@@ -468,8 +501,12 @@ export function createVenom(button, canvas, { color = '#2f7bff' } = {}) {
   };
 
   // ── input ──
+  let visible = false;
   const toLocal = () => {
     const r = canvas.getBoundingClientRect();
+    const was = visible;
+    visible = r.width > 0 && r.bottom > -100 && r.top < window.innerHeight + 100;
+    if (visible && !was) dirty = true;
     if (!r.width) return;
     pointer.x = ((pointer.cx - r.left) / r.width) * W;
     pointer.y = ((pointer.cy - r.top) / r.height) * H;
@@ -508,9 +545,6 @@ export function createVenom(button, canvas, { color = '#2f7bff' } = {}) {
   ro.observe(button);
   layout();
 
-  let visible = true;
-  const io = new IntersectionObserver(([e]) => { visible = e.isIntersecting; dirty = true; }, { rootMargin: '150px' });
-  io.observe(canvas);
 
   let raf = 0;
   let last = performance.now();
@@ -518,8 +552,9 @@ export function createVenom(button, canvas, { color = '#2f7bff' } = {}) {
     raf = requestAnimationFrame(frame);
     const dt = Math.min((now - last) / 1000, 1 / 30);
     last = now;
-    if (!visible || document.hidden) return;
+    if (document.hidden) return;
     toLocal();
+    if (!visible) return;
     const active = strands.length || drops.length || sparks.length || Math.abs(lump.len) > 0.05 || Math.abs(lump.vel) > 0.05
       || Math.abs(press - pressTarget) > 0.002 || hover > 0.002 || (pointer.present && pillDist(pointer.x, pointer.y) < REACH + 30);
     if (!active && !dirty) return;
@@ -537,7 +572,6 @@ export function createVenom(button, canvas, { color = '#2f7bff' } = {}) {
   function destroy() {
     cancelAnimationFrame(raf);
     ro.disconnect();
-    io.disconnect();
     window.removeEventListener('pointermove', onMove);
     document.documentElement.removeEventListener('pointerleave', onLeaveWin);
     window.removeEventListener('blur', onLeaveWin);

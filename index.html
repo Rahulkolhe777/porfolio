@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Rahul Kolhe – Full-Stack & AI Developer</title>
     <link rel="preconnect" href="https://api.fontshare.com" />
-    <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" />
+    <!-- font loads without blocking the page (falls back to system font if the CDN is slow) -->
+    <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" media="print" onload="this.media='all'" />
+    <noscript><link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" /></noscript>
   </head>
   <body>
     <div id="root"></div>

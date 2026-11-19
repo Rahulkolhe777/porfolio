@@ -26,7 +26,7 @@ export default function Services() {
         <span className="text-brand-deep font-bold uppercase text-[10px] md:text-xs tracking-[0.2em] mb-2 flex items-center gap-1.5">
           <Sparkles className="w-4 h-4" aria-hidden="true" /> What I Do
         </span>
-        <h2 className="text-3xl md:text-5xl font-black tracking-tight uppercase text-white">Services &amp; Pricing.</h2>
+        <h2 className="text-3xl md:text-5xl font-black tracking-tight uppercase text-white">Services.</h2>
         <div className="w-12 h-1 bg-brand-deep mt-2 rounded-full shadow-[0_0_12px_rgba(47,123,255,0.6)]" />
       </div>
 
@@ -44,10 +44,6 @@ export default function Services() {
                     <span className="glass-blue inline-block mt-1.5 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full text-white">Specialty</span>
                   )}
                 </div>
-                <div className="md:text-right shrink-0">
-                  <span className="block text-[10px] font-semibold uppercase tracking-wider text-gray-500 mb-1">{s.priceLabel}</span>
-                  <span className="glass-chip inline-block text-xs md:text-base font-black tabular-nums px-3 py-1 md:px-3.5 rounded-full text-gray-100 group-hover:text-white">{s.price}</span>
-                </div>
               </div>
               <span
                 aria-hidden="true"
@@ -60,7 +56,7 @@ export default function Services() {
         ))}
       </ul>
       <p className="mt-8 w-full max-w-4xl text-center text-[11px] md:text-xs text-gray-500 leading-relaxed z-10">
-        *Final pricing depends on features, complexity, timeline and project scope.
+        Every project is quoted individually. Get in touch to discuss yours.
       </p>
     </section>
   );

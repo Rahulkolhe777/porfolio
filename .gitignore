@@ -1,0 +1,10 @@
+node_modules
+dist
+
+# local AI-tool folders
+.agents
+.claude
+skills-lock.json
+
+.env*
+*.log

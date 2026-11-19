@@ -293,10 +293,8 @@ export default function Projects({ onSelect }) {
     const T = new THREE.Vector3();
     const flat = new THREE.Vector3();
     const normal = new THREE.Vector3();
-    const side = new THREE.Vector3();
     const UP = new THREE.Vector3(0, 1, 0);
     const Z = new THREE.Vector3(0, 0, 1);
-    const basis = new THREE.Matrix4();
     const railQ = new THREE.Quaternion();
     const identity = new THREE.Quaternion();
     const wobble = new THREE.Quaternion();
@@ -323,8 +321,15 @@ export default function Projects({ onSelect }) {
         flat.normalize();
         normal.crossVectors(flat, UP).normalize();
         if (normal.z < 0) normal.negate();
-        basis.makeBasis(side.crossVectors(UP, normal).normalize(), UP, normal);
-        railQ.setFromRotationMatrix(basis);
+        // Cards mostly face the camera: following the rail exactly turned them
+        // edge-on (thin, squashed) where the rail swings sideways. Keep only a
+        // limited lean along the rail so they still swoop.
+        const railYaw = Math.atan2(normal.x, normal.z);
+        const camYaw = Math.atan2(camera.position.x - P.x, camera.position.z - P.z);
+        let dev = railYaw - camYaw;
+        dev = Math.atan2(Math.sin(dev), Math.cos(dev));
+        const maxDev = THREE.MathUtils.lerp(0.45, 0.2, THREE.MathUtils.smoothstep(P.z, -20, 2));
+        railQ.setFromAxisAngle(UP, camYaw + THREE.MathUtils.clamp(dev, -maxDev, maxDev));
         const railScale = CFG.CARD_W / ASPECT;
         const c = layout.cells[i];
         if (st.fly <= 0) {

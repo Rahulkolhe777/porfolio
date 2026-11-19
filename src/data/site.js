@@ -1,6 +1,6 @@
 // ─── Everything personal lives here. Edit this file first. ───
 export const site = {
-  name: 'Alex Carter', // DUMMY — replace with your name
+  name: 'Rahul Kolhe',
   tagline: 'CS ENGINEER • INDEPENDENT DEVELOPER',
   roles: ['FULL-STACK DEVELOPER', 'AI BUILDER'],
   heroLine: 'Building intelligent software that solves real problems.',
@@ -29,12 +29,12 @@ export const site = {
   },
   contact: {
     email: 'you@example.com',
-    phone: '+910000000000',
-    whatsapp: '910000000000', // digits only, used in wa.me link
+    phone: '+918485877032',
+    whatsapp: '918485877032', // digits only, used in wa.me link
   },
   socials: [
-    { id: 'github', label: 'GitHub', href: 'https://github.com/your-username' },
-    { id: 'linkedin', label: 'LinkedIn', href: 'https://linkedin.com/in/your-username' },
+    { id: 'github', label: 'GitHub', href: 'https://github.com/Rahulkolhe777' },
+    // { id: 'linkedin', label: 'LinkedIn', href: 'https://linkedin.com/in/your-username' },
   ],
 };
 

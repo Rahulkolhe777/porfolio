@@ -8,6 +8,9 @@ export const HERO_FOCUS_X = 0.69; // where the subject sits horizontally (0–1)
 // The abstract core (used until there's a photo) sits inside the big right
 // glass shard instead of on the seam where three shards meet (~0.72, 0.49).
 const CORE = { x: 0.835, y: 0.46 };
+// The photo sits a little right of centre-right and slightly oversized so the
+// point where three glass shards meet falls on the neck, not the face.
+const PORTRAIT = { x: 0.74, scale: 1.04 };
 
 function loadImage(src) {
   return new Promise((resolve) => {
@@ -144,9 +147,9 @@ function paintBacklight(ctx, cx, cy, radius) {
 }
 
 function paintPortrait(ctx, img) {
-  const h = H * 0.94;
+  const h = H * PORTRAIT.scale;
   const w = (img.width / img.height) * h;
-  const cx = W * HERO_FOCUS_X;
+  const cx = W * PORTRAIT.x;
   const x = cx - w / 2;
   const y = H - h;
   paintBacklight(ctx, cx, H * 0.42, H * 0.55);
@@ -251,7 +254,7 @@ export async function createHeroArt({ heroImage, profileImage }) {
   const photo = await loadImage(profileImage);
   if (photo) {
     paintPortrait(ctx, photo);
-    canvas.focus = { x: HERO_FOCUS_X, y: 0.42 };
+    canvas.focus = { x: PORTRAIT.x, y: 0.4 };
   } else {
     paintCore(ctx);
     canvas.focus = CORE;

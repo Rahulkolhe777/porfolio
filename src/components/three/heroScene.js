@@ -184,8 +184,10 @@ ${shader.fragmentShader}`.replace(
       THREE.ShaderChunk.emissivemap_fragment.replace(
         'vec4 emissiveColor = texture2D( emissiveMap, vEmissiveMapUv );',
         `vec2 euv = vEmissiveMapUv;
-        vec2 fp = euv - uArtFocus; fp.x *= 1.78;
-        float keep = smoothstep(0.1, 0.36, length(fp));
+        // only the blue smoke moves: weight by how blue the picture is here,
+        // so the photo / core stays perfectly still
+        vec3 base0 = texture2D( emissiveMap, euv ).rgb;
+        float keep = smoothstep(0.03, 0.22, base0.b - max(base0.r, base0.g));
         float t = uArtTime;
         vec2 flow = vec2(
           sin(euv.y * 9.0 + t * 0.35) + 0.5 * sin(euv.y * 17.0 + euv.x * 6.0 - t * 0.27),
@@ -193,9 +195,9 @@ ${shader.fragmentShader}`.replace(
         euv += flow * 0.007 * keep + uParallax;
         vec4 emissiveColor = texture2D( emissiveMap, euv );
         vec2 huv = (euv - 0.5) * 0.8 + 0.5 + vec2(t * 0.007, sin(t * 0.07) * 0.012) + uParallax * 1.8;
-        vec2 hp = huv - uArtFocus; hp.x *= 1.78;
         vec3 haze = texture2D( emissiveMap, huv ).rgb;
-        float hazeMask = keep * smoothstep(0.1, 0.36, length(hp)) * (0.35 + 0.65 * smoothstep(0.15, 0.6, euv.x));
+        float hazeBlue = smoothstep(0.05, 0.3, haze.b - max(haze.r, haze.g));
+        float hazeMask = keep * hazeBlue * (0.35 + 0.65 * smoothstep(0.15, 0.6, euv.x));
         emissiveColor.rgb += haze * haze * 0.42 * hazeMask;`,
       ),
     );
@@ -241,7 +243,7 @@ ${shader.fragmentShader}`.replace(
       let su = 1, sv = 1;
       if (aspect > texAspect) sv = texAspect / aspect;
       else su = aspect / texAspect;
-      const shift = su < 1 ? Math.min(0.5, Math.max(0, (HERO_FOCUS_X - 0.5) / (1 - su))) : 0;
+      const shift = su < 1 ? Math.min(0.5, Math.max(0, (focus.x - 0.5) / (1 - su))) : 0;
       for (let i = 0; i < posAttr.count; i++) {
         const u = (posAttr.getX(i) / K + 0.5) * su + (1 - su) / 2 + shift * (1 - su);
         const v = (posAttr.getY(i) / G + 0.5) * sv + (1 - sv) / 2;

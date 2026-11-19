@@ -16,8 +16,9 @@ export default function Contact() {
   const headRef = useRef(null);
   const cardsRef = useRef(null);
   const formRef = useRef(null);
-  const [sent, setSent] = useState(false);
-  const { email, phone, whatsapp } = site.contact;
+  const [sent, setSent] = useState(false); // false | 'mail' | 'delivered'
+  const [status, setStatus] = useState('idle'); // idle | sending | error
+  const { email, phone, whatsapp, web3formsKey } = site.contact;
 
   useEffect(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -30,14 +31,44 @@ export default function Contact() {
     return () => ctx.revert();
   }, []);
 
-  // No backend needed: opens the visitor's email app with the message pre-filled.
-  const onSubmit = (e) => {
-    e.preventDefault();
-    const f = new FormData(e.currentTarget);
+  const openMailApp = (f) => {
     const subject = encodeURIComponent(`Project Inquiry from ${f.get('name')}`);
     const body = encodeURIComponent(`Name: ${f.get('name')}\nEmail: ${f.get('email')}\n\nMessage:\n${f.get('message')}`);
     window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
-    setSent(true);
+    setSent('mail');
+  };
+
+  // No backend of our own: with a Web3Forms key the message is emailed straight
+  // to the inbox; without one, the visitor's email app opens pre-filled.
+  const onSubmit = async (e) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const f = new FormData(form);
+    if (f.get('botcheck')) return; // spam bot filled the hidden field
+    if (!web3formsKey) return openMailApp(f);
+    setStatus('sending');
+    try {
+      const res = await fetch('https://api.web3forms.com/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          access_key: web3formsKey,
+          subject: `Portfolio: new message from ${f.get('name')}`,
+          from_name: `${site.name} Portfolio`,
+          name: f.get('name'),
+          email: f.get('email'),
+          replyto: f.get('email'),
+          message: f.get('message'),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) throw new Error(data.message || 'Failed');
+      form.reset();
+      setStatus('idle');
+      setSent('delivered');
+    } catch {
+      setStatus('error');
+    }
   };
 
   return (
@@ -82,12 +113,17 @@ export default function Contact() {
           {sent ? (
             <div className="py-12 flex flex-col items-center text-center">
               <div className="glass-blue w-16 h-16 text-white rounded-full flex items-center justify-center text-3xl font-black mb-4 animate-bounce">✓</div>
-              <h3 className="text-3xl font-black uppercase tracking-tight text-white mb-3">Message Ready!</h3>
-              <p className="text-lg text-gray-300 font-medium max-w-md">Thanks for reaching out! Your email app has been opened with the project details pre-filled.</p>
+              <h3 className="text-3xl font-black uppercase tracking-tight text-white mb-3">{sent === 'delivered' ? 'Message Sent!' : 'Message Ready!'}</h3>
+              <p className="text-lg text-gray-300 font-medium max-w-md">
+                {sent === 'delivered'
+                  ? "Thanks for reaching out! I've got your message and will reply to your email soon."
+                  : 'Thanks for reaching out! Your email app has been opened with the project details pre-filled.'}
+              </p>
               <button type="button" onClick={() => setSent(false)} className="mt-6 glass-chip rounded-full px-5 py-2 text-xs font-bold uppercase tracking-wider">Send another</button>
             </div>
           ) : (
             <form onSubmit={onSubmit} className="flex flex-col gap-7">
+              <input type="checkbox" name="botcheck" className="hidden" tabIndex={-1} autoComplete="off" aria-hidden="true" />
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-white/[0.03] border border-white/10">
                 <div className="flex items-center gap-3 min-w-0">
                   <span className="w-10 h-10 shrink-0 rounded-full glass-chip flex items-center justify-center text-brand"><Mail size={18} aria-hidden="true" /></span>
@@ -118,8 +154,15 @@ export default function Contact() {
                 <span className={labelClass}>Message &amp; Project Scope</span>
                 <textarea name="message" required rows={5} placeholder="Tell me about your idea, timeline and what you need built..." className={`${inputClass} resize-none`} />
               </label>
-              <div className="flex justify-center pt-2">
-                <LiquidButton type="submit">Send Message <Send className="w-4 h-4" aria-hidden="true" /></LiquidButton>
+              <div className="flex flex-col items-center gap-3 pt-2">
+                <LiquidButton type="submit">
+                  {status === 'sending' ? 'Sending…' : 'Send Message'} <Send className="w-4 h-4" aria-hidden="true" />
+                </LiquidButton>
+                {status === 'error' && (
+                  <p role="alert" className="text-sm text-red-300 text-center">
+                    Couldn&apos;t send right now. Please message me on WhatsApp or email me directly.
+                  </p>
+                )}
               </div>
             </form>
           )}

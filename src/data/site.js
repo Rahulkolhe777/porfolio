@@ -28,6 +28,10 @@ export const site = {
     focus: ['Full-Stack Apps', 'AI Integration', 'Backend APIs', '3D Web'],
   },
   contact: {
+    // Contact form delivery (free, no backend): get a key at https://web3forms.com
+    // by entering the email you want messages sent to, then paste it here.
+    // Leave '' to fall back to opening the visitor's email app.
+    web3formsKey: '',
     email: 'you@example.com',
     phone: '+918485877032',
     whatsapp: '918485877032', // digits only, used in wa.me link

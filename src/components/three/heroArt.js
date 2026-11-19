@@ -5,6 +5,9 @@
 const W = 2048;
 const H = 1152;
 export const HERO_FOCUS_X = 0.69; // where the subject sits horizontally (0–1)
+// The abstract core (used until there's a photo) sits inside the big right
+// glass shard instead of on the seam where three shards meet (~0.72, 0.49).
+const CORE = { x: 0.835, y: 0.46 };
 
 function loadImage(src) {
   return new Promise((resolve) => {
@@ -60,8 +63,10 @@ const smooth = (a, b, x) => {
 };
 
 function paintNebula(ctx) {
-  const w = 384;
-  const h = 216;
+  // smaller noise grid on phones / weak CPUs (it's upscaled + blurred anyway)
+  const lite = window.matchMedia('(max-width: 768px)').matches || (navigator.hardwareConcurrency || 8) <= 4;
+  const w = lite ? 384 : 512;
+  const h = lite ? 216 : 288;
   const small = document.createElement('canvas');
   small.width = w;
   small.height = h;
@@ -183,8 +188,8 @@ function paintPortrait(ctx, img) {
 
 function paintCore(ctx) {
   // abstract glowing energy core used when there is no photo yet
-  const cx = W * HERO_FOCUS_X;
-  const cy = H * 0.48;
+  const cx = W * CORE.x;
+  const cy = H * CORE.y;
   paintBacklight(ctx, cx, cy, H * 0.6);
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
@@ -235,6 +240,7 @@ export async function createHeroArt({ heroImage, profileImage }) {
     const w = custom.width * scale;
     const h = custom.height * scale;
     ctx.drawImage(custom, (W - w) / 2, (H - h) / 2, w, h);
+    canvas.focus = { x: HERO_FOCUS_X, y: 0.45 };
     return canvas;
   }
 
@@ -243,8 +249,13 @@ export async function createHeroArt({ heroImage, profileImage }) {
   paintNebula(ctx);
   paintSparks(ctx);
   const photo = await loadImage(profileImage);
-  if (photo) paintPortrait(ctx, photo);
-  else paintCore(ctx);
+  if (photo) {
+    paintPortrait(ctx, photo);
+    canvas.focus = { x: HERO_FOCUS_X, y: 0.42 };
+  } else {
+    paintCore(ctx);
+    canvas.focus = CORE;
+  }
   darkenLeft(ctx);
   return canvas;
 }

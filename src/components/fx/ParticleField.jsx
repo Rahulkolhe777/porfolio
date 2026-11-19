@@ -99,7 +99,9 @@ export default function ParticleField() {
     }
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const small = window.matchMedia('(max-width: 768px), (pointer: coarse)').matches;
-    const dpr = Math.min(window.devicePixelRatio || 1, small ? 1.5 : 2);
+    // weak laptops: fewer particles + lower resolution (these are soft glows anyway)
+    const weak = (navigator.hardwareConcurrency || 8) <= 4 || (navigator.deviceMemory || 8) <= 4;
+    const dpr = Math.min(window.devicePixelRatio || 1, small || weak ? 1.25 : 1.75);
     renderer.setPixelRatio(dpr);
     renderer.setClearColor(0, 0);
     host.appendChild(renderer.domElement);
@@ -109,7 +111,7 @@ export default function ParticleField() {
     const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 200);
     camera.position.set(0, 0, 6);
 
-    const count = small ? 900 : 2200;
+    const count = small ? 800 : weak ? 1300 : 2200;
     const pos = new Float32Array(count * 3);
     const size = new Float32Array(count);
     const seed = new Float32Array(count);
@@ -193,6 +195,7 @@ export default function ParticleField() {
     let raf = 0;
     const tick = (now) => {
       raf = requestAnimationFrame(tick);
+      if (document.hidden) { last = now; return; }
       const dt = Math.min((now - last) / 1000, 0.05);
       last = now;
       const sy = window.scrollY;

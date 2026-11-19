@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import gsap from 'gsap';
 import { site } from '../../data/site';
 import { createHeroArt } from '../three/heroArt';
-import { createHeroScene } from '../three/heroScene';
 import LiquidButton from '../ui/LiquidButton';
 
 function hasWebGL() {
@@ -39,14 +38,17 @@ export default function Hero({ ready }) {
     if (webgl === null) return;
     let cancelled = false;
     let handle = null;
-    createHeroArt({ heroImage: site.heroImage, profileImage: site.profileImage }).then((canvas) => {
+    // three.js + the glass scene download while the art is painted
+    const scenePromise = webgl ? import('../three/heroScene').catch(() => null) : Promise.resolve(null);
+    Promise.all([createHeroArt({ heroImage: site.heroImage, profileImage: site.profileImage }), scenePromise]).then(([canvas, mod]) => {
       if (cancelled) return;
-      if (!webgl) {
+      if (!webgl || !mod) {
+        if (webgl) setWebgl(false); // chunk failed to load: show the flat picture instead
         setFallbackArt(canvas.toDataURL('image/jpeg', 0.85));
         mountRef.current?.setAttribute('data-scene-ready', '1');
         return;
       }
-      handle = createHeroScene({
+      handle = mod.createHeroScene({
         section: sectionRef.current,
         mount: mountRef.current,
         copy: copyRef.current,

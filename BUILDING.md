@@ -30,7 +30,7 @@ headless-Chrome screenshots taken at every scroll position (loader frames, hover
 
 ## 2. Tech stack
 
-React 18 + Vite 6 · Tailwind CSS 4 · Three.js · GSAP + ScrollTrigger · lucide-react (UI icons) · simple-icons (tech logos) · General Sans font.
+React 18 + Vite 6 · Tailwind CSS 4 · Three.js · GSAP + ScrollTrigger · Lenis (smooth scroll) · lucide-react (UI icons) · simple-icons (tech logos) · General Sans font.
 No backend: the contact form opens the visitor's email app with the message pre-filled.
 
 ---
@@ -86,6 +86,10 @@ src/
 - [x] Rebuild every effect in blue (table in section 1)
 - [x] Compare against the reference in headless Chrome at every scroll position, desktop and mobile
 - [x] Production build passes (`npm run build`, ~890 kB JS)
+- [x] Upgrade pass: living hero smoke (flows + parallax behind the glass, core moved off the seam),
+      faster loading (three.js lazy-loaded, first load ~360 kB JS instead of ~870 kB; effects pause in
+      background tabs and run lighter on weak devices), Lenis smooth scroll, two scroll-reactive text
+      marquees (words in `site.js` → `marquee`)
 - [ ] Replace the placeholder content with your real details (checklist below)
 - [ ] Deploy to Vercel
 

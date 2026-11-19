@@ -338,3 +338,46 @@ body::after {
   html { scroll-behavior: auto !important; }
   *, ::before, ::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }
+
+/* ── Smooth scroll (Lenis) ── */
+html.lenis, html.lenis body { height: auto; }
+.lenis.lenis-smooth { scroll-behavior: auto !important; }
+.lenis.lenis-smooth [data-lenis-prevent] { overscroll-behavior: contain; }
+.lenis.lenis-stopped { overflow: clip; }
+
+/* ── Scrolling text marquee ── */
+.marquee {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  padding: clamp(18px, 3vw, 34px) 0;
+  transform: rotate(var(--tilt, 0deg)) scale(1.04);
+  border-block: 1px solid rgb(var(--glow) / 0.18);
+  background: linear-gradient(90deg, rgb(5 6 10 / 0.9), rgb(10 20 45 / 0.55) 50%, rgb(5 6 10 / 0.9));
+  box-shadow: 0 0 60px -20px rgb(var(--glow) / 0.35);
+  -webkit-mask: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+  mask: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+.marquee__track { display: flex; width: max-content; will-change: transform; }
+.marquee__item { display: inline-flex; align-items: center; gap: clamp(20px, 3vw, 44px); padding-right: clamp(20px, 3vw, 44px); }
+.marquee__word {
+  font-weight: 900;
+  font-size: clamp(2.6rem, 7vw, 6.5rem);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #fff;
+}
+.marquee__word--outline {
+  color: transparent;
+  -webkit-text-stroke: 1.5px rgb(127 176 255 / 0.85);
+  text-shadow: 0 0 28px rgb(var(--glow) / 0.35);
+}
+.marquee__dot {
+  width: clamp(10px, 1.2vw, 16px);
+  aspect-ratio: 1;
+  border-radius: 9999px;
+  background: var(--color-brand);
+  box-shadow: 0 0 14px 3px rgb(var(--glow) / 0.8);
+}

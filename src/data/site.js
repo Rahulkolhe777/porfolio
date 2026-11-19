@@ -12,6 +12,11 @@ export const site = {
   // Loader intro line + the words that glow blue
   loaderStatement: 'THE DEVELOPER WHO TURNS IDEAS INTO SOFTWARE',
   loaderAccentWords: ['DEVELOPER', 'IDEAS', 'SOFTWARE'],
+  // Big scrolling text strips between sections (first: after stats, second: before skills)
+  marquee: [
+    ['Full-Stack', 'AI Builder', '3D Web', 'Backend APIs', 'Clean UI'],
+    ['React', 'Python', 'FastAPI', 'PostgreSQL', 'Three.js', 'Supabase'],
+  ],
   about: {
     subtitle: 'Independent Developer',
     caption: 'Engineer · Developer · Builder',

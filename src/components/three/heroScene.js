@@ -165,6 +165,41 @@ export function createHeroScene({ section, mount, copy, artCanvas }) {
       ),
     );
   };
+  // Living artwork: the smoke behind the glass slowly flows (domain-warped
+  // sampling + a second, drifting haze layer), while the subject (photo/core)
+  // stays still. Each shard also gets a slightly different parallax shift so
+  // the picture reads as sitting *behind* thick glass.
+  const artTime = { value: 0 };
+  const focus = artCanvas.focus || { x: HERO_FOCUS_X, y: 0.45 };
+  const artFocus = { value: new THREE.Vector2(focus.x, 1 - focus.y) };
+  const addFlow = (shader, parallax) => {
+    shader.uniforms.uArtTime = artTime;
+    shader.uniforms.uArtFocus = artFocus;
+    shader.uniforms.uParallax = parallax;
+    shader.fragmentShader = `uniform float uArtTime;
+uniform vec2 uArtFocus;
+uniform vec2 uParallax;
+${shader.fragmentShader}`.replace(
+      '#include <emissivemap_fragment>',
+      THREE.ShaderChunk.emissivemap_fragment.replace(
+        'vec4 emissiveColor = texture2D( emissiveMap, vEmissiveMapUv );',
+        `vec2 euv = vEmissiveMapUv;
+        vec2 fp = euv - uArtFocus; fp.x *= 1.78;
+        float keep = smoothstep(0.1, 0.36, length(fp));
+        float t = uArtTime;
+        vec2 flow = vec2(
+          sin(euv.y * 9.0 + t * 0.35) + 0.5 * sin(euv.y * 17.0 + euv.x * 6.0 - t * 0.27),
+          cos(euv.x * 8.0 - t * 0.3) + 0.5 * cos(euv.x * 15.0 + euv.y * 5.0 + t * 0.22));
+        euv += flow * 0.007 * keep + uParallax;
+        vec4 emissiveColor = texture2D( emissiveMap, euv );
+        vec2 huv = (euv - 0.5) * 0.8 + 0.5 + vec2(t * 0.007, sin(t * 0.07) * 0.012) + uParallax * 1.8;
+        vec2 hp = huv - uArtFocus; hp.x *= 1.78;
+        vec3 haze = texture2D( emissiveMap, huv ).rgb;
+        float hazeMask = keep * smoothstep(0.1, 0.36, length(hp)) * (0.35 + 0.65 * smoothstep(0.15, 0.6, euv.x));
+        emissiveColor.rgb += haze * haze * 0.42 * hazeMask;`,
+      ),
+    );
+  };
   const edgeMat = new THREE.LineBasicMaterial({ color: reflection, transparent: true, opacity: 0.35 });
 
   let shards = [];
@@ -215,8 +250,9 @@ export function createHeroScene({ section, mount, copy, artCanvas }) {
       uvAttr.needsUpdate = true;
 
       const mat = baseMat.clone();
-      mat.onBeforeCompile = tintIridescence;
-      mat.customProgramCacheKey = () => 'blue-iridescence';
+      const parallax = prev[idx]?.parallax ?? { value: new THREE.Vector2() };
+      mat.onBeforeCompile = (shader) => { tintIridescence(shader); addFlow(shader, parallax); };
+      mat.customProgramCacheKey = () => 'blue-iridescence-flow';
       const mesh = new THREE.Mesh(geo, mat);
       const edge = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 25), edgeMat);
       mesh.add(edge);
@@ -227,7 +263,8 @@ export function createHeroScene({ section, mount, copy, artCanvas }) {
       const cy = pts.reduce((a, p) => a + p[1], 0) / pts.length;
       const old = prev[idx];
       shards.push({
-        mesh, edge, mat,
+        mesh, edge, mat, parallax,
+        depth: 0.8 + (idx % 3) * 0.25,
         dir: new THREE.Vector3(cx / K, cy / G, 0.4 + (idx % 3) * 0.25).normalize(),
         spin: old?.spin ?? new THREE.Vector3((Math.random() - 0.5) * 1.6, (Math.random() - 0.5) * 1.6, (Math.random() - 0.5) * 0.8),
         lift: old?.lift ?? 0,
@@ -360,10 +397,11 @@ export function createHeroScene({ section, mount, copy, artCanvas }) {
 
   const frame = (now) => {
     raf = requestAnimationFrame(frame);
-    if (!visible) { last = now; return; }
+    if (!visible || document.hidden) { last = now; return; }
     const dt = Math.min((now - last) / 1000, 0.05);
     last = now;
     const t = now / 1000;
+    if (!reduced) artTime.value = t % 3600;
     const ease = (k) => 1 - Math.exp(-k * dt);
 
     if (introState.playing) {
@@ -415,6 +453,7 @@ export function createHeroScene({ section, mount, copy, artCanvas }) {
         s.spin.y * burst + s.lift * 0.06 * pointer.x + s.x.position * 0.06,
         s.spin.z * burst + s.x.position * 0.025,
       );
+      s.parallax.value.set(tilt.y * 0.09 * s.depth, tilt.x * 0.09 * s.depth);
       s.mat.emissiveIntensity = 0.92 * (1 - burst * 0.5) + s.lift * 0.1;
     });
 

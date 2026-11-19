@@ -381,3 +381,16 @@ html.lenis, html.lenis body { height: auto; }
   background: var(--color-brand);
   box-shadow: 0 0 14px 3px rgb(var(--glow) / 0.8);
 }
+
+/* ── Venom liquid button (WebGL) ── */
+.venom-wrap { position: relative; z-index: 2; display: inline-flex; isolation: isolate; }
+.venom-canvas { position: absolute; z-index: 0; pointer-events: none; }
+.venom-wrap .liquid-btn { z-index: 1; }
+.liquid-btn.venom-on {
+  background: transparent; border-color: transparent; box-shadow: none; overflow: visible;
+  text-shadow: 0 1px 6px rgb(0 0 0 / 0.9);
+  transform: scale(calc(1 - var(--press) * .03));
+}
+.liquid-btn.venom-on::before, .liquid-btn.venom-on::after, .liquid-btn.venom-on .lb-blob { display: none; }
+.liquid-btn.venom-on:hover { border-color: transparent; box-shadow: none; }
+.liquid-btn.venom-on:focus-visible { outline: 2px solid var(--color-brand-soft); outline-offset: 4px; }

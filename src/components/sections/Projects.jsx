@@ -82,12 +82,12 @@ const fragmentShader = /* glsl */ `
     float mask = 1.0 - smoothstep(-0.003, 0.003, d);
     if (mask < 0.01) discard;
     vec3 col = texture2D(map, uv * uvScale + uvOffset).rgb;
-    col *= 0.82 + 0.28 * uHover;
+    col *= 0.92 + 0.22 * uHover;
     col += vec3(1.0) * 0.07 * smoothstep(0.55, 1.0, uv.y) * (1.0 - uv.x * 0.6);
     col += vec3(0.12, 0.42, 1.0) * 0.2 * uHover * smoothstep(0.45, 0.0, uv.y);
-    float rim = smoothstep(-0.022, -0.004, d);
-    vec3 rimCol = mix(vec3(0.75, 0.78, 0.85), vec3(0.35, 0.6, 1.0), uHover);
-    col = mix(col, rimCol, rim * (0.35 + 0.35 * uHover));
+    float rim = smoothstep(-0.026, -0.004, d);
+    vec3 rimCol = mix(vec3(0.78, 0.8, 0.86), vec3(0.35, 0.6, 1.0), uHover);
+    col = mix(col, rimCol, rim * (0.45 + 0.3 * uHover));
     gl_FragColor = vec4(col, mask * uOpacity);
   }
 `;
@@ -329,7 +329,10 @@ export default function Projects({ onSelect }) {
         let dev = railYaw - camYaw;
         dev = Math.atan2(Math.sin(dev), Math.cos(dev));
         const maxDev = THREE.MathUtils.lerp(0.45, 0.2, THREE.MathUtils.smoothstep(P.z, -20, 2));
-        railQ.setFromAxisAngle(UP, camYaw + THREE.MathUtils.clamp(dev, -maxDev, maxDev));
+        const lean = THREE.MathUtils.clamp(dev, -maxDev, maxDev);
+        railQ.setFromAxisAngle(UP, camYaw + lean);
+        wobble.setFromAxisAngle(Z, -lean * 0.18); // slight bank, like a card gliding past
+        railQ.multiply(wobble);
         const railScale = CFG.CARD_W / ASPECT;
         const c = layout.cells[i];
         if (st.fly <= 0) {

@@ -1,9 +1,32 @@
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { theme } from '../../theme';
 
-// Glossy "liquid glass" pill: a light blob follows the cursor across the
-// surface, it squishes when pressed and a refraction streak sweeps over it.
+// Primary call-to-action button.
+// With WebGL it becomes a glossy black liquid ("venom") blob whose sticky
+// strands reach for the cursor (see fx/venomButton.js). Without WebGL, or with
+// reduced motion, it falls back to the CSS liquid-glass pill.
 export default function LiquidButton({ children, href, onClick, type = 'button', className = '' }) {
   const ref = useRef(null);
+  const canvasRef = useRef(null);
+  const [venom, setVenom] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    let handle = null;
+    let cancelled = false;
+    import('../fx/venomButton').then(({ createVenom }) => {
+      if (cancelled || !ref.current || !canvasRef.current) return;
+      handle = createVenom(el, canvasRef.current, { color: theme.accent });
+      if (!handle) return;
+      handle.onFail(() => setVenom(false));
+      setVenom(true);
+    });
+    return () => {
+      cancelled = true;
+      handle?.destroy();
+    };
+  }, []);
 
   const move = (e) => {
     const el = ref.current;
@@ -21,7 +44,7 @@ export default function LiquidButton({ children, href, onClick, type = 'button',
     onPointerDown: press(1),
     onPointerUp: press(0),
     onPointerLeave: press(0),
-    className: `liquid-btn ${className}`,
+    className: `liquid-btn ${venom ? 'venom-on' : ''}`,
   };
   const inner = (
     <>
@@ -29,5 +52,10 @@ export default function LiquidButton({ children, href, onClick, type = 'button',
       {children}
     </>
   );
-  return href ? <a href={href} {...props}>{inner}</a> : <button type={type} {...props}>{inner}</button>;
+  return (
+    <span className={`venom-wrap ${className}`}>
+      <canvas ref={canvasRef} className="venom-canvas" aria-hidden="true" style={venom ? undefined : { display: 'none' }} />
+      {href ? <a href={href} {...props}>{inner}</a> : <button type={type} {...props}>{inner}</button>}
+    </span>
+  );
 }

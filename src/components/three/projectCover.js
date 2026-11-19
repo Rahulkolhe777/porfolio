@@ -185,6 +185,49 @@ const art = {
   },
 };
 
+function chips(ctx, tags, x, y, maxX, font, size = 28, align = 'left') {
+  ctx.font = `600 ${size}px ${font}`;
+  const pad = size * 0.7;
+  const h = size * 2;
+  const list = (tags || []).slice(0, 5).map((t) => ({ t, w: ctx.measureText(t).width + pad * 2 }));
+  if (align === 'center') {
+    const total = list.reduce((a, c) => a + c.w + 12, -12);
+    x = (W - total) / 2;
+  }
+  list.forEach(({ t, w }) => {
+    if (x + w > maxX) return;
+    roundRect(ctx, x, y, w, h, h / 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.05)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.24)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.fillStyle = '#cbd5e1';
+    ctx.fillText(t, x + pad, y + h * 0.68);
+    x += w + 12;
+  });
+}
+
+function fitFont(ctx, text, weight, start, min, maxW, font) {
+  let size = start;
+  ctx.font = `${weight} ${size}px ${font}`;
+  while (ctx.measureText(text).width > maxW && size > min) {
+    size -= 4;
+    ctx.font = `${weight} ${size}px ${font}`;
+  }
+  let t = text;
+  while (ctx.measureText(t).width > maxW && t.length > 4) t = `${t.slice(0, -2)}…`;
+  return t;
+}
+
+function spaced(ctx, px) {
+  if ('letterSpacing' in ctx) ctx.letterSpacing = `${px}px`;
+}
+
+// Three layouts (cycled per card) like a designed project grid:
+//  A: label + title + stack at top-left, illustration on the right
+//  B: giant number in the middle with the illustration over it, title centred at the bottom
+//  C: number tag top-left, big illustration top-right, huge title bottom-left
 export function drawProjectCover(project, index, owner) {
   const canvas = document.createElement('canvas');
   canvas.width = W;
@@ -192,93 +235,114 @@ export function drawProjectCover(project, index, owner) {
   const ctx = canvas.getContext('2d');
   const r = rand(index + 3);
   const font = '"General Sans", system-ui, sans-serif';
-
-  // background
-  ctx.fillStyle = '#07090f';
-  ctx.fillRect(0, 0, W, H);
-  let g = ctx.createRadialGradient(W * 0.72, H * 1.05, 0, W * 0.72, H * 1.05, W * 0.75);
-  g.addColorStop(0, 'rgba(30,100,255,0.6)');
-  g.addColorStop(0.5, 'rgba(15,50,170,0.24)');
-  g.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, W, H);
-  g = ctx.createRadialGradient(W * 0.6, H * 0.15, 0, W * 0.6, H * 0.15, W * 0.4);
-  g.addColorStop(0, 'rgba(60,120,255,0.14)');
-  g.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, W, H);
-
-  // giant faint number
-  ctx.save();
-  ctx.font = `800 560px ${font}`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = 'rgba(255,255,255,0.06)';
-  ctx.fillText(project.number, W * 0.7, H * 0.53);
-  ctx.strokeStyle = 'rgba(90,150,255,0.09)';
-  ctx.lineWidth = 3;
-  ctx.strokeText(project.number, W * 0.7, H * 0.53);
-  ctx.restore();
-
-  // illustration
+  const layout = project.layout || ['A', 'A', 'A', 'A', 'B', 'B', 'B', 'C', 'C'][index % 9];
   const kind = project.art || ARTS[index % ARTS.length];
-  ctx.save();
-  (art[kind] || art.network)(ctx, W * 0.56, H * 0.17, W * 0.38, H * 0.62, r);
-  ctx.restore();
 
-  // text block
+  // charcoal base + coloured glow rising from the bottom (the cards' signature look)
+  ctx.fillStyle = '#0b0d13';
+  ctx.fillRect(0, 0, W, H);
+  const gx = layout === 'A' ? W * 0.62 : layout === 'B' ? W * 0.5 : W * 0.45;
+  let g = ctx.createRadialGradient(gx, H * 1.02, 0, gx, H * 1.02, W * 0.7);
+  g.addColorStop(0, 'rgba(45,115,255,0.95)');
+  g.addColorStop(0.3, 'rgba(28,80,225,0.55)');
+  g.addColorStop(0.65, 'rgba(15,40,140,0.18)');
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+  g = ctx.createRadialGradient(W * 0.8, H * 0.2, 0, W * 0.8, H * 0.2, W * 0.45);
+  g.addColorStop(0, 'rgba(70,130,255,0.2)');
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+  // darker top-left so text reads
+  g = ctx.createLinearGradient(0, 0, W * 0.7, H * 0.7);
+  g.addColorStop(0, 'rgba(5,6,10,0.55)');
+  g.addColorStop(1, 'rgba(5,6,10,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+
   ctx.textBaseline = 'alphabetic';
-  if ('letterSpacing' in ctx) ctx.letterSpacing = '4px';
-  ctx.font = `700 26px ${font}`;
-  ctx.fillStyle = BLUE;
-  ctx.fillText(`PROJECT ${project.number}`, 80, 100);
-  ctx.fillRect(80, 118, 52, 5);
-  if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
 
-  ctx.fillStyle = '#ffffff';
-  // shrink long titles to fit the left half, truncate only as a last resort
-  let size = 84;
-  let title = project.title;
-  ctx.font = `700 ${size}px ${font}`;
-  while (ctx.measureText(title).width > W * 0.5 && size > 56) { size -= 4; ctx.font = `700 ${size}px ${font}`; }
-  while (ctx.measureText(title).width > W * 0.5 && title.length > 4) title = `${title.slice(0, -2)}…`;
-  ctx.fillText(title, 80, 220);
-  ctx.fillStyle = '#aab3c5';
-  ctx.font = `500 40px ${font}`;
-  ctx.fillText(project.subtitle, 80, 280);
-
-  if ('letterSpacing' in ctx) ctx.letterSpacing = '3px';
-  ctx.fillStyle = '#6b7280';
-  ctx.font = `600 18px ${font}`;
-  ctx.fillText('STACK', 80, 370);
-  if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
-
-  ctx.font = `600 28px ${font}`;
-  let x = 80;
-  let y = 394;
-  (project.tags || []).slice(0, 5).forEach((tag) => {
-    const tw = ctx.measureText(tag).width + 40;
-    if (x + tw > W * 0.54) { x = 80; y += 72; }
-    roundRect(ctx, x, y, tw, 56, 28);
+  if (layout === 'B') {
+    ctx.save();
+    ctx.font = `800 700px ${font}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(255,255,255,0.09)';
+    ctx.fillText(project.number, W * 0.5, H * 0.43);
+    ctx.strokeStyle = 'rgba(120,170,255,0.16)';
+    ctx.lineWidth = 3;
+    ctx.strokeText(project.number, W * 0.5, H * 0.43);
+    ctx.restore();
+    ctx.save();
+    (art[kind] || art.network)(ctx, W * 0.27, H * 0.08, W * 0.46, H * 0.62, r);
+    ctx.restore();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffffff';
+    const t = fitFont(ctx, project.title, 700, 66, 44, W * 0.84, font);
+    ctx.fillText(t, W / 2, H * 0.84);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#8b95a8';
+    ctx.font = `500 26px ${font}`;
+    const line = (project.tags || []).slice(0, 4).join('  ·  ');
+    const lw = ctx.measureText(line).width;
+    ctx.fillText(line, (W - lw) / 2, H * 0.92);
+  } else if (layout === 'C') {
+    ctx.save();
+    (art[kind] || art.network)(ctx, W * 0.52, H * 0.06, W * 0.42, H * 0.56, r);
+    ctx.restore();
+    spaced(ctx, 4);
+    ctx.font = `700 30px ${font}`;
+    ctx.fillStyle = BLUE;
+    ctx.fillText(project.number, 80, 104);
+    ctx.fillRect(80, 122, 52, 5);
+    spaced(ctx, 0);
+    ctx.fillStyle = '#ffffff';
+    const t = fitFont(ctx, project.title, 700, 116, 64, W * 0.86, font);
+    ctx.fillText(t, 80, H * 0.72);
+    ctx.fillStyle = '#b4bccb';
+    ctx.font = `500 50px ${font}`;
+    ctx.fillText(project.subtitle, 82, H * 0.72 + 66);
+    chips(ctx, project.tags, 80, H * 0.72 + 100, W * 0.9, font, 26);
+  } else {
+    ctx.save();
+    ctx.font = `800 560px ${font}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
     ctx.fillStyle = 'rgba(255,255,255,0.05)';
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.22)';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-    ctx.fillStyle = '#cbd5e1';
-    ctx.fillText(tag, x + 20, y + 38);
-    x += tw + 12;
-  });
+    ctx.fillText(project.number, W * 0.72, H * 0.53);
+    ctx.restore();
+    ctx.save();
+    (art[kind] || art.network)(ctx, W * 0.54, H * 0.14, W * 0.4, H * 0.66, r);
+    ctx.restore();
+    spaced(ctx, 4);
+    ctx.font = `700 26px ${font}`;
+    ctx.fillStyle = BLUE;
+    ctx.fillText(`PROJECT ${project.number}`, 80, 100);
+    ctx.fillRect(80, 118, 52, 5);
+    spaced(ctx, 0);
+    ctx.fillStyle = '#ffffff';
+    const t = fitFont(ctx, project.title, 700, 88, 56, W * 0.5, font);
+    ctx.fillText(t, 80, 222);
+    ctx.fillStyle = '#aab3c5';
+    ctx.font = `500 42px ${font}`;
+    ctx.fillText(project.subtitle, 80, 284);
+    spaced(ctx, 3);
+    ctx.fillStyle = '#6b7280';
+    ctx.font = `600 18px ${font}`;
+    ctx.fillText('STACK', 80, 372);
+    spaced(ctx, 0);
+    chips(ctx, project.tags, 80, 394, W * 0.54, font, 28);
+    ctx.fillStyle = '#6b7280';
+    ctx.font = `500 26px ${font}`;
+    ctx.fillText(`${owner} · Developer`, 80, H - 70);
+  }
 
-  ctx.fillStyle = '#6b7280';
-  ctx.font = `500 26px ${font}`;
-  ctx.fillText(`${owner} · Developer`, 80, H - 70);
-
-  // top gloss
-  g = ctx.createLinearGradient(0, 0, 0, H * 0.4);
-  g.addColorStop(0, 'rgba(255,255,255,0.05)');
+  // glass sheen across the top
+  g = ctx.createLinearGradient(0, 0, 0, H * 0.45);
+  g.addColorStop(0, 'rgba(255,255,255,0.06)');
   g.addColorStop(1, 'rgba(255,255,255,0)');
   ctx.fillStyle = g;
-  ctx.fillRect(0, 0, W, H * 0.4);
+  ctx.fillRect(0, 0, W, H * 0.45);
   return canvas;
 }

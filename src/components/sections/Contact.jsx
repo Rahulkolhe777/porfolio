@@ -11,14 +11,36 @@ gsap.registerPlugin(ScrollTrigger);
 const inputClass = 'glass-input w-full rounded-2xl px-6 py-5 text-lg text-white placeholder:text-gray-500';
 const labelClass = 'text-sm md:text-base font-bold uppercase tracking-wider text-gray-400';
 
+// Anti-spam limits for the contact form
+const SPAM = {
+  minFillMs: 3000, // faster than this = a bot
+  cooldownMs: 60_000, // one message per minute per browser
+  perDay: 3, // max messages per browser per day
+  maxLinks: 2, // more links than this in a message = junk
+};
+const SENDS_KEY = 'contact-sends';
+const readSends = () => {
+  try {
+    const v = JSON.parse(localStorage.getItem(SENDS_KEY) || '[]');
+    return Array.isArray(v) ? v.filter((t) => Date.now() - t < 864e5) : [];
+  } catch {
+    return [];
+  }
+};
+const writeSends = (list) => {
+  try { localStorage.setItem(SENDS_KEY, JSON.stringify(list.slice(-10))); } catch { /* storage blocked */ }
+};
+
 export default function Contact() {
   const sectionRef = useRef(null);
   const headRef = useRef(null);
   const cardsRef = useRef(null);
   const formRef = useRef(null);
   const [sent, setSent] = useState(false); // false | 'mail' | 'delivered'
-  const [status, setStatus] = useState('idle'); // idle | sending | error
+  const [status, setStatus] = useState('idle'); // idle | sending | error | limited
   const { email, phone, whatsapp, web3formsKey } = site.contact;
+  const shownAt = useRef(Date.now());
+  useEffect(() => { if (!sent) shownAt.current = Date.now(); }, [sent]);
 
   useEffect(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -47,7 +69,27 @@ export default function Contact() {
     if (status === 'sending') return;
     const form = e.currentTarget;
     const f = new FormData(form);
-    if (f.get('botcheck')) return; // spam bot filled the hidden field
+    // ── spam guards (invisible to real visitors) ──
+    // bots: filled the hidden field, or submitted faster than a human can type.
+    // Pretend it worked so they don't learn to adapt.
+    if (f.get('botcheck') || Date.now() - shownAt.current < SPAM.minFillMs) {
+      form.reset();
+      setSent('delivered');
+      return;
+    }
+    // junk: too many links in the message
+    if ((String(f.get('message')).match(/https?:\/\/|www\./gi) || []).length > SPAM.maxLinks) {
+      setStatus('error');
+      return;
+    }
+    // flooding: limit how often one browser can send
+    const history = readSends();
+    const now = Date.now();
+    if ((history.length && now - history[history.length - 1] < SPAM.cooldownMs)
+      || history.filter((t) => now - t < 864e5).length >= SPAM.perDay) {
+      setStatus('limited');
+      return;
+    }
     setStatus('sending');
     const subject = `Portfolio: new message from ${f.get('name')}`;
     try {
@@ -63,6 +105,7 @@ export default function Contact() {
               email: f.get('email'),
               replyto: f.get('email'),
               message: f.get('message'),
+              botcheck: '', // Web3Forms also rejects server-side if this is filled
             }),
           })
         : await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(email)}`, {
@@ -81,6 +124,7 @@ export default function Contact() {
       const data = await res.json().catch(() => ({}));
       const ok = res.ok && (data.success === true || data.success === 'true');
       if (!ok) throw new Error(data.message || 'Failed');
+      writeSends([...history, now]);
       form.reset();
       setStatus('idle');
       setSent('delivered');
@@ -161,21 +205,26 @@ export default function Contact() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <label className="flex flex-col gap-3">
                   <span className={labelClass}>Your Name</span>
-                  <input name="name" required placeholder="Your Name" className={inputClass} />
+                  <input name="name" required minLength={2} maxLength={80} placeholder="Your Name" className={inputClass} />
                 </label>
                 <label className="flex flex-col gap-3">
                   <span className={labelClass}>Your Email</span>
-                  <input name="email" type="email" required placeholder="your.email@example.com" className={inputClass} />
+                  <input name="email" type="email" required maxLength={120} placeholder="your.email@example.com" className={inputClass} />
                 </label>
               </div>
               <label className="flex flex-col gap-3">
                 <span className={labelClass}>Message &amp; Project Scope</span>
-                <textarea name="message" required rows={5} placeholder="Tell me about your idea, timeline and what you need built..." className={`${inputClass} resize-none`} />
+                <textarea name="message" required minLength={10} maxLength={3000} rows={5} placeholder="Tell me about your idea, timeline and what you need built..." className={`${inputClass} resize-none`} />
               </label>
               <div className="flex flex-col items-center gap-3 pt-2">
                 <LiquidButton type="submit">
                   {status === 'sending' ? 'Sending…' : 'Send Message'} <Send className="w-4 h-4" aria-hidden="true" />
                 </LiquidButton>
+                {status === 'limited' && (
+                  <p role="alert" className="text-sm text-amber-300 text-center">
+                    You&apos;ve just sent a message. Please wait a bit before sending another, or reach me on WhatsApp.
+                  </p>
+                )}
                 {status === 'error' && (
                   <p role="alert" className="text-sm text-red-300 text-center">
                     Couldn&apos;t send right now. Please message me on WhatsApp, or{' '}

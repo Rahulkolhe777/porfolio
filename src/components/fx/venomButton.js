@@ -378,9 +378,9 @@ export function createVenom(button, canvas, { color = '#2f7bff' } = {}) {
         // fast tip motion makes the strand body twang sideways
         s.wob.vx += (-(s.tip.x - pvx) * 5 - s.wob.x * 120 - s.wob.vx * 8) * dt * 10;
         s.wob.vy += (-(s.tip.y - pvy) * 5 - s.wob.y * 120 - s.wob.vy * 8) * dt * 10;
-        s.wob.x += s.wob.vx * dt;
-        s.wob.y += s.wob.vy * dt;
-        const L = Math.hypot(s.tip.x - s.root.x, s.tip.y - s.root.y);
+        s.wob.x = Math.max(-24, Math.min(24, s.wob.x + s.wob.vx * dt));
+        s.wob.y = Math.max(-24, Math.min(24, s.wob.y + s.wob.vy * dt));
+        const L =Math.hypot(s.tip.x - s.root.x, s.tip.y - s.root.y);
         s.len = L;
         if (L > MAX_LEN || !near) snap(s, near || dOut >= REACH);
       } else {
@@ -546,11 +546,30 @@ export function createVenom(button, canvas, { color = '#2f7bff' } = {}) {
   layout();
 
 
+  // If anything ever goes non-finite, drop the liquid back to a calm pill
+  // instead of letting NaN reach the shader (which blanks the body / paints a box).
+  const fin = Number.isFinite;
+  const healthy = () => fin(lump.len) && fin(lump.vel) && fin(lump.x) && fin(lump.y) && fin(hover) && fin(press)
+    && strands.every((s) => fin(s.tip.x) && fin(s.tip.y) && fin(s.root.x) && fin(s.root.y) && fin(s.wob.x) && fin(s.wob.y))
+    && drops.every((d) => fin(d.x) && fin(d.y)) && sparks.every((p) => fin(p.x) && fin(p.y) && fin(p.vx) && fin(p.vy));
+  const calm = () => {
+    strands = [];
+    drops = [];
+    sparks = [];
+    Object.assign(lump, { len: 0, vel: 0, nx: 1, ny: 0 });
+    if (!fin(lump.x) || !fin(lump.y)) { lump.x = box.cx; lump.y = box.cy; }
+    hover = fin(hover) ? hover : 0;
+    press = fin(press) ? press : 0;
+  };
+
+  // The springs are stiff, so they are integrated in small fixed sub-steps:
+  // stepping once per frame blows up below ~45 fps (battery saver, busy laptop).
+  const SUB = 1 / 120;
   let raf = 0;
   let last = performance.now();
   const frame = (now) => {
     raf = requestAnimationFrame(frame);
-    const dt = Math.min((now - last) / 1000, 1 / 30);
+    const dt = Math.max(0, Math.min((now - last) / 1000, 1 / 20));
     last = now;
     if (document.hidden) return;
     toLocal();
@@ -558,8 +577,10 @@ export function createVenom(button, canvas, { color = '#2f7bff' } = {}) {
     const active = strands.length || drops.length || sparks.length || Math.abs(lump.len) > 0.05 || Math.abs(lump.vel) > 0.05
       || Math.abs(press - pressTarget) > 0.002 || hover > 0.002 || (pointer.present && pillDist(pointer.x, pointer.y) < REACH + 30);
     if (!active && !dirty) return;
-    if (!reduced) step(dt);
-    else { press = pressTarget; hover = 0; }
+    if (!reduced) {
+      for (let left = dt; left > 1e-6; left -= SUB) step(Math.min(SUB, left));
+      if (!healthy()) calm();
+    } else { press = pressTarget; hover = 0; }
     render();
     dirty = false;
   };

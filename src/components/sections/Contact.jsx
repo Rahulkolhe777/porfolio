@@ -38,31 +38,49 @@ export default function Contact() {
     setSent('mail');
   };
 
-  // No backend of our own: with a Web3Forms key the message is emailed straight
-  // to the inbox; without one, the visitor's email app opens pre-filled.
+  // No backend of our own: the message is emailed straight to the inbox.
+  // With a Web3Forms key it goes through Web3Forms; without one, through
+  // FormSubmit (needs only the email — the very first message sends an
+  // "Activate" email to that inbox, click it once and all later messages arrive).
   const onSubmit = async (e) => {
     e.preventDefault();
+    if (status === 'sending') return;
     const form = e.currentTarget;
     const f = new FormData(form);
     if (f.get('botcheck')) return; // spam bot filled the hidden field
-    if (!web3formsKey) return openMailApp(f);
     setStatus('sending');
+    const subject = `Portfolio: new message from ${f.get('name')}`;
     try {
-      const res = await fetch('https://api.web3forms.com/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({
-          access_key: web3formsKey,
-          subject: `Portfolio: new message from ${f.get('name')}`,
-          from_name: `${site.name} Portfolio`,
-          name: f.get('name'),
-          email: f.get('email'),
-          replyto: f.get('email'),
-          message: f.get('message'),
-        }),
-      });
+      const res = web3formsKey
+        ? await fetch('https://api.web3forms.com/submit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify({
+              access_key: web3formsKey,
+              subject,
+              from_name: `${site.name} Portfolio`,
+              name: f.get('name'),
+              email: f.get('email'),
+              replyto: f.get('email'),
+              message: f.get('message'),
+            }),
+          })
+        : await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(email)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify({
+              _subject: subject,
+              _template: 'table',
+              _captcha: 'false',
+              name: f.get('name'),
+              email: f.get('email'),
+              _replyto: f.get('email'),
+              message: f.get('message'),
+            }),
+          });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success) throw new Error(data.message || 'Failed');
+      const ok = res.ok && (data.success === true || data.success === 'true');
+      if (!ok) throw new Error(data.message || 'Failed');
       form.reset();
       setStatus('idle');
       setSent('delivered');
@@ -160,7 +178,10 @@ export default function Contact() {
                 </LiquidButton>
                 {status === 'error' && (
                   <p role="alert" className="text-sm text-red-300 text-center">
-                    Couldn&apos;t send right now. Please message me on WhatsApp or email me directly.
+                    Couldn&apos;t send right now. Please message me on WhatsApp, or{' '}
+                    <button type="button" onClick={(ev) => openMailApp(new FormData(ev.currentTarget.form))} className="underline font-bold text-red-200">
+                      send it from your email app
+                    </button>.
                   </p>
                 )}
               </div>

@@ -298,11 +298,12 @@ export function drawProjectCover(project, index, owner) {
     ctx.fillRect(80, 122, 52, 5);
     spaced(ctx, 0);
     ctx.fillStyle = '#ffffff';
-    const t = fitFont(ctx, project.title, 700, 116, 64, W * 0.86, font);
+    const k = project.titleScale || 1; // optional per-project text size (data/projects.js)
+    const t = fitFont(ctx, project.title, 700, Math.round(116 * k), Math.round(64 * k), W * 0.86, font);
     ctx.fillText(t, 80, H * 0.72);
     ctx.fillStyle = '#b4bccb';
-    ctx.font = `500 50px ${font}`;
-    ctx.fillText(project.subtitle, 82, H * 0.72 + 66);
+    ctx.font = `500 ${Math.round(50 * k)}px ${font}`;
+    ctx.fillText(project.subtitle, 82, H * 0.72 + Math.round(66 * k));
     chips(ctx, project.tags, 80, H * 0.72 + 100, W * 0.9, font, 26);
   } else {
     ctx.save();

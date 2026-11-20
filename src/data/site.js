@@ -15,7 +15,7 @@ export const site = {
   // Big scrolling text strips between sections (first: after stats, second: before skills)
   marquee: [
     ['Full-Stack', 'AI Builder', '3D Web', 'Backend APIs', 'Clean UI'],
-    ['React', 'Python', 'FastAPI', 'PostgreSQL', 'Three.js', 'Supabase'],
+    ['React', 'TypeScript', 'Node.js', 'MongoDB', 'PostgreSQL', 'Redis'],
   ],
   about: {
     subtitle: 'Independent Developer',
@@ -24,15 +24,15 @@ export const site = {
       "I'm a Computer Science Engineering student and independent developer who builds full-stack and AI-powered software.",
       'I turn ideas into working products, from clean backends and databases to interactive front ends.',
     ],
-    technologies: ['React', 'JavaScript', 'Python', 'FastAPI', 'PostgreSQL', 'Supabase'],
+    technologies: ['React', 'TypeScript', 'Node.js', 'Express', 'MongoDB', 'PostgreSQL'],
     focus: ['Full-Stack Apps', 'AI Integration', 'Backend APIs', '3D Web'],
   },
   contact: {
     // Contact form delivery (free, no backend): get a key at https://web3forms.com
     // by entering the email you want messages sent to, then paste it here.
     // Leave '' to fall back to opening the visitor's email app.
-    web3formsKey: '',
-    email: 'you@example.com',
+    web3formsKey: '72b656f8-f404-4058-89d8-e7a07df0ece4',
+    email: 'kolherahul656@gmail.com',
     phone: '+918485877032',
     whatsapp: '918485877032', // digits only, used in wa.me link
   },
